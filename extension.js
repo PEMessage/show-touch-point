@@ -45,8 +45,6 @@ export default class RedCircleExtension extends Extension {
         });
 
         // --- 2. Multitouch Handling (Event Listener) ---
-        // We use the integer 'slot' ID (0, 1, 2...) as the Map key,
-        // because the sequence object itself changes reference on every event.
         this._touchCircles = new Map(); // Map<number, St.Bin>
 
         this._eventHandlerId = global.stage.connect('captured-event', (stage, event) => {
@@ -63,33 +61,22 @@ export default class RedCircleExtension extends Extension {
             const sequence = event.get_event_sequence();
             if (!sequence) return Clutter.EVENT_PROPAGATE;
 
-            // CRITICAL FIX: Use .get_slot() to get the stable integer ID for the finger
             const slot = sequence.get_slot();
 
-            if (type === Clutter.EventType.TOUCH_BEGIN) {
-                const [x, y] = event.get_coords();
+            // Handle different touch event types
+            switch (type) {
+                case Clutter.EventType.TOUCH_BEGIN:
+                    this._handleTouchBegin(slot, event);
+                    break;
 
-                // Create new circle for this finger slot
-                const circle = this._createCircle();
-                this._updateCirclePos(circle, x, y);
+                case Clutter.EventType.TOUCH_UPDATE:
+                    this._handleTouchUpdate(slot, event);
+                    break;
 
-                this._touchCircles.set(slot, circle);
-            }
-            else if (type === Clutter.EventType.TOUCH_UPDATE) {
-                const circle = this._touchCircles.get(slot);
-
-                if (circle) {
-                    const [x, y] = event.get_coords();
-                    this._updateCirclePos(circle, x, y);
-                }
-            }
-            else if (type === Clutter.EventType.TOUCH_END || type === Clutter.EventType.TOUCH_CANCEL) {
-                const circle = this._touchCircles.get(slot);
-
-                if (circle) {
-                    circle.destroy();
-                    this._touchCircles.delete(slot);
-                }
+                case Clutter.EventType.TOUCH_END:
+                case Clutter.EventType.TOUCH_CANCEL:
+                    this._handleTouchEnd(slot);
+                    break;
             }
 
             return Clutter.EVENT_PROPAGATE;
@@ -116,7 +103,52 @@ export default class RedCircleExtension extends Extension {
         }
 
         // Clean up all active touch circles
+        this._cleanupAllTouchCircles();
+    }
+
+    _handleTouchBegin(slot, event) {
+        // CRITICAL FIX: Check if circle already exists for this slot
+        if (this._touchCircles.has(slot)) {
+            console.warn(`Circle already exists for touch slot ${slot}, cleaning up first`);
+            this._handleTouchEnd(slot); // Clean up existing circle first
+        }
+
+        const [x, y] = event.get_coords();
+
+        // Create new circle for this finger slot
+        const circle = this._createCircle();
+        this._updateCirclePos(circle, x, y);
+
+        this._touchCircles.set(slot, circle);
+        console.log(`Touch BEGIN - Slot: ${slot}, Active circles: ${this._touchCircles.size}`);
+    }
+
+    _handleTouchUpdate(slot, event) {
+        const circle = this._touchCircles.get(slot);
+
+        if (circle) {
+            const [x, y] = event.get_coords();
+            this._updateCirclePos(circle, x, y);
+        } else {
+            console.warn(`Touch UPDATE - No circle found for slot ${slot}`);
+        }
+    }
+
+    _handleTouchEnd(slot) {
+        const circle = this._touchCircles.get(slot);
+
+        if (circle) {
+            circle.destroy();
+            this._touchCircles.delete(slot);
+            console.log(`Touch END - Slot: ${slot}, Remaining circles: ${this._touchCircles.size}`);
+        } else {
+            console.warn(`Touch END - No circle found for slot ${slot}`);
+        }
+    }
+
+    _cleanupAllTouchCircles() {
         if (this._touchCircles) {
+            console.log(`Cleaning up ${this._touchCircles.size} orphaned touch circles`);
             for (const circle of this._touchCircles.values()) {
                 circle.destroy();
             }

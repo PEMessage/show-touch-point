@@ -1,0 +1,8 @@
+{
+  "name": "Show TouchPoint",
+  "description": "Show TouchPoint",
+  "uuid": "showtouchpoint@example.com",
+  "shell-version": [
+    "46"
+  ]
+}

@@ -4,5 +4,6 @@
   "uuid": "showtouchpoint@example.com",
   "shell-version": [
     "46"
-  ]
+  ],
+  "settings-schema": "org.gnome.shell.extensions.showtouchpoint"
 }

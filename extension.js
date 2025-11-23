@@ -25,7 +25,52 @@ const CIRCLE_DIAMETER = 50;
 
 export default class RedCircleExtension extends Extension {
     enable() {
-        // --- 1. Mouse Cursor Handling (Polling) ---
+        // Load settings - this is the correct way for GNOME 45+
+        this._settings = this.getSettings("org.gnome.shell.extensions.showtouchpoint");
+        console.log('Extension enabled, settings loaded:', this._settings);
+
+        // Initialize state
+        this._mouseCircle = null;
+        this._touchCircles = new Map();
+        this._timerId = null;
+        this._eventHandlerId = null;
+
+        // Enable features based on settings
+        if (this._settings.get_boolean('show-mouse')) {
+            this._enableMouseTracking();
+        }
+
+        if (this._settings.get_boolean('show-touch')) {
+            this._enableTouchTracking();
+        }
+
+        // Connect to settings changes
+        this._settingsHandlerId = this._settings.connect('changed', (settings, key) => {
+            this._handleSettingsChange(key);
+        });
+    }
+
+    disable() {
+        console.log('Extension disabled');
+
+        // Disconnect settings handler
+        if (this._settingsHandlerId) {
+            this._settings.disconnect(this._settingsHandlerId);
+            this._settingsHandlerId = null;
+        }
+
+        // Clean up everything
+        this._disableMouseTracking();
+        this._disableTouchTracking();
+
+        this._settings = null;
+    }
+
+    _enableMouseTracking() {
+        if (this._mouseCircle || this._timerId) {
+            return; // Already enabled
+        }
+
         this._mouseCircle = this._createCircle();
         this._mouseCircle.set_position(-100, -100);
 
@@ -33,7 +78,8 @@ export default class RedCircleExtension extends Extension {
             if (!this._mouseCircle) return GLib.SOURCE_REMOVE;
 
             // Hide mouse circle if using touch to avoid duplicates
-            if (this._touchCircles && this._touchCircles.size > 0) {
+            const showTouch = this._settings.get_boolean('show-touch');
+            if (showTouch && this._touchCircles && this._touchCircles.size > 0) {
                 this._mouseCircle.hide();
             } else {
                 this._mouseCircle.show();
@@ -43,9 +89,26 @@ export default class RedCircleExtension extends Extension {
 
             return GLib.SOURCE_CONTINUE;
         });
+    }
 
-        // --- 2. Multitouch Handling (Event Listener) ---
-        this._touchCircles = new Map(); // Map<number, St.Bin>
+    _disableMouseTracking() {
+        // Clean up mouse timer
+        if (this._timerId) {
+            GLib.source_remove(this._timerId);
+            this._timerId = null;
+        }
+
+        // Clean up mouse circle
+        if (this._mouseCircle) {
+            this._mouseCircle.destroy();
+            this._mouseCircle = null;
+        }
+    }
+
+    _enableTouchTracking() {
+        if (this._eventHandlerId) {
+            return; // Already enabled
+        }
 
         this._eventHandlerId = global.stage.connect('captured-event', (stage, event) => {
             const type = event.type();
@@ -83,19 +146,7 @@ export default class RedCircleExtension extends Extension {
         });
     }
 
-    disable() {
-        // Clean up mouse timer
-        if (this._timerId) {
-            GLib.source_remove(this._timerId);
-            this._timerId = null;
-        }
-
-        // Clean up mouse circle
-        if (this._mouseCircle) {
-            this._mouseCircle.destroy();
-            this._mouseCircle = null;
-        }
-
+    _disableTouchTracking() {
         // Clean up event listener
         if (this._eventHandlerId) {
             global.stage.disconnect(this._eventHandlerId);
@@ -106,8 +157,30 @@ export default class RedCircleExtension extends Extension {
         this._cleanupAllTouchCircles();
     }
 
+    _handleSettingsChange(key) {
+        console.log('Settings changed:', key);
+
+        switch (key) {
+            case 'show-mouse':
+                if (this._settings.get_boolean('show-mouse')) {
+                    this._enableMouseTracking();
+                } else {
+                    this._disableMouseTracking();
+                }
+                break;
+
+            case 'show-touch':
+                if (this._settings.get_boolean('show-touch')) {
+                    this._enableTouchTracking();
+                } else {
+                    this._disableTouchTracking();
+                }
+                break;
+        }
+    }
+
     _handleTouchBegin(slot, event) {
-        // CRITICAL FIX: Check if circle already exists for this slot
+        // Check if circle already exists for this slot
         if (this._touchCircles.has(slot)) {
             console.warn(`Circle already exists for touch slot ${slot}, cleaning up first`);
             this._handleTouchEnd(slot); // Clean up existing circle first
@@ -153,7 +226,6 @@ export default class RedCircleExtension extends Extension {
                 circle.destroy();
             }
             this._touchCircles.clear();
-            this._touchCircles = null;
         }
     }
 

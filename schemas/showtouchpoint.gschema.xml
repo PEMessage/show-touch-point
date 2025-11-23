@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.showtouchpoint" path="/org/gnome/shell/extensions/showtouchpoint/">
+    <key name="show-mouse" type="b">
+      <default>true</default>
+      <summary>Show mouse cursor circle</summary>
+      <description>Display a red circle around the mouse cursor</description>
+    </key>
+    <key name="show-touch" type="b">
+      <default>true</default>
+      <summary>Show touch circles</summary>
+      <description>Display red circles for touch input</description>
+    </key>
+  </schema>
+</schemalist>

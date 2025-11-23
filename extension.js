@@ -17,6 +17,7 @@
  */
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
+import GLib from 'gi://GLib'; // Import GLib for the timer
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
@@ -29,40 +30,38 @@ export default class RedCircleExtension extends Extension {
             style: 'background-color: rgba(255, 0, 0, 0.3); border: 2px solid red; border-radius: 50%;',
             width: CIRCLE_DIAMETER,
             height: CIRCLE_DIAMETER,
-            reactive: false, // CRITICAL: Allows clicks to pass through the circle to windows below
+            reactive: false, // CRITICAL: Allows clicks to pass through
         });
 
-        // 2. Add it to the UI group so it sits above standard windows
+        // 2. Add it to the UI group so it sits above windows
         Main.layoutManager.uiGroup.add_child(this._circle);
 
-        // 3. Initial positioning (hide it off-screen until mouse moves or set to 0,0)
+        // 3. Initial positioning
         this._circle.set_position(-100, -100);
 
-        // 4. Connect to the global stage to track mouse movement
-        this._handlerId = global.stage.connect('captured-event', (stage, event) => {
-            const type = event.type();
+        // 4. Start a timer to poll the mouse position every 16ms (~60fps)
+        // This works better on X11 where event listeners might be blocked by app windows
+        this._timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            if (!this._circle) return GLib.SOURCE_REMOVE;
 
-            // Update position on motion or touch update
-            if (type === Clutter.EventType.MOTION) {
-                const [x, y] = event.get_coords();
+            // Get global pointer coordinates
+            const [x, y] = global.get_pointer();
 
-                // Center the circle on the cursor
-                this._circle.set_position(
-                    x - (CIRCLE_DIAMETER / 2),
-                    y - (CIRCLE_DIAMETER / 2)
-                );
-            }
+            // Center the circle
+            this._circle.set_position(
+                x - (CIRCLE_DIAMETER / 2),
+                y - (CIRCLE_DIAMETER / 2)
+            );
 
-            // Always propagate the event so the OS handles the actual mouse input
-            return Clutter.EVENT_PROPAGATE;
+            return GLib.SOURCE_CONTINUE;
         });
     }
 
     disable() {
-        // Clean up the event listener
-        if (this._handlerId) {
-            global.stage.disconnect(this._handlerId);
-            this._handlerId = null;
+        // Stop the timer
+        if (this._timerId) {
+            GLib.source_remove(this._timerId);
+            this._timerId = null;
         }
 
         // Destroy the circle actor

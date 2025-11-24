@@ -2,7 +2,7 @@
 <schemalist>
   <schema id="org.gnome.shell.extensions.showtouchpoint" path="/org/gnome/shell/extensions/showtouchpoint/">
     <key name="show-mouse" type="b">
-      <default>true</default>
+      <default>false</default>
       <summary>Show mouse cursor circle</summary>
       <description>Display a red circle around the mouse cursor</description>
     </key>

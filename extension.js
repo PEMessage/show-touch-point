@@ -21,7 +21,7 @@ import GLib from 'gi://GLib';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const CIRCLE_DIAMETER = 50;
+const CIRCLE_DIAMETER = 20;
 
 export default class RedCircleExtension extends Extension {
     enable() {
